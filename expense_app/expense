@@ -4,16 +4,17 @@ require 'pg'
 require 'io/console' # for using IO#getch: https://ruby-doc.org/stdlib-2.7.1/libdoc/io/console/rdoc/IO.html#method-i-getch
 
 class ExpenseData
-  
   def initialize
     # By using a constant here, we can access the connection from within both list_expenses and add_expense. This is a sign that we are missing an object in our design.
     @connection = PG.connect(dbname: "expense_app_ls185") # create a connecton to db you created, my db name is `expense_app_ls185` and has the `expenses` tables
+    setup_schema # creates the `expenses` table in the db if it does not already exist
   end
 
   # method for listing all the expenses
   def list_expenses  
     result = @connection.exec("SELECT * from expenses ORDER BY created_on")  # execute query on the db
-    display_expenses(result)
+    display_count(result)  # tells if there are any rows in expenses table, if not, then it tells us and below line isn't executed (ntuples is not > 0)
+    display_expenses(result) if result.ntuples > 0
   end
 
   def add_expense(amount, memo)
@@ -48,6 +49,17 @@ class ExpenseData
     puts "All expenses have been deleted."
   end
 
+  private 
+
+  def display_count(expenses)
+    count = expenses.ntuples
+    if count == 0
+      puts "There are no expenses."
+    else
+      puts "There are #{count} expense#{"s" if count > 1}"
+    end
+  end
+
   def display_expenses(expenses)
     expenses.each do |tuple|
       columns = [ tuple['id'].rjust(3),  # all the columns per an individual row in table
@@ -55,6 +67,24 @@ class ExpenseData
                  tuple["amount"].rjust(12),
                  tuple["memo"] ]
       puts columns.join(' | ')
+    end
+
+    puts "-" * 50 # for -------
+    
+    amount_sum = expenses.field_values("amount").map(&:to_f).inject(:+)
+    puts "Total #{amount_sum.to_s.rjust(25)}"
+  end
+
+  # create the table `expenses` if it doesn't already exist in the database given in dbname in #initialize
+  def setup_schema
+    result = @connection.exec("SELECT COUNT(*) FROM information_schema.tables 
+                      WHERE table_schema = 'public' AND table_name = 'expenses';")
+    if result[0]["count"] == 0
+      @connection.exec("CREATE TABLE expenses (
+                        id serial PRIMARY KEY,
+                        amount numeric(6,2) NOT NULL CHECK (amount >= 0.01),
+                        memo text NOT NULL,
+                        created_on date NOT NULL);")
     end
   end
 end
