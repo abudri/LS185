@@ -1,6 +1,7 @@
 #! /usr/bin/env ruby
 
 require 'pg'
+require 'io/console' # for using IO#getch: https://ruby-doc.org/stdlib-2.7.1/libdoc/io/console/rdoc/IO.html#method-i-getch
 
 class ExpenseData
   
@@ -42,6 +43,11 @@ class ExpenseData
     end
   end
 
+  def delete_all_expenses
+    @connection.exec("DELETE FROM expenses")
+    puts "All expenses have been deleted."
+  end
+
   def display_expenses(expenses)
     expenses.each do |tuple|
       columns = [ tuple['id'].rjust(3),  # all the columns per an individual row in table
@@ -72,6 +78,10 @@ class CLI
       @application.search_expense(arguments[0])
     when "delete"
       @application.delete_expense(arguments[0])
+    when "clear"
+      "This will remove all expenses. Are you sure? (y/n)"
+      response = $stdin.getch
+      @application.delete_all_expenses if response == "y"
     else
       display_help
     end
