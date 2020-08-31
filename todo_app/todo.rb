@@ -78,8 +78,35 @@ class SessionPersistence
     @session[:lists] << { id: id, name: list_name, todos: [] } # remember in our form the <input> tag had a `name` of "list_name", so this is the key, and the value is whatever data we submitted if any, not there yet at this point, and note "list_name" can simply be treated as a symbol by sinatra, so :list_name in params hash
   end
 
-  def delete_list(id)
-    @session[:lists].reject! {|list| list[:id] == id } # remove the list - which is a hash itself, from the session array. refactored in lesson 6 to use Array#reject! and an actual id not based on index, for the list: https://launchschool.com/lessons/2c69904e/assignments/a8c93890
+  def delete_list(list_id)
+    @session[:lists].reject! {|list| list[:id] == list_id } # remove the list - which is a hash itself, from the session array. refactored in lesson 6 to use Array#reject! and an actual id not based on index, for the list: https://launchschool.com/lessons/2c69904e/assignments/a8c93890
+  end
+
+  def update_list_name(list_id, new_name)
+    list = find_list(list_id)
+    list[:name] = new_name
+  end
+
+  def create_new_todo(list_id, todo_name) # adding a new todo item to a list
+    list = find_list(list_id)
+    id = next_element_id(list[:todos]) # assign an id to the new todo item, Lesson 6 assignment: https://launchschool.com/lessons/9230c94c/assignments/046ee3e0, refactored to general method for lists and ids in next assignment: https://launchschool.com/lessons/2c69904e/assignments/a8c93890
+    list[:todos] << { id: id, name: todo_name, completed: false } # params[:todo] is the submitted text taken from form submission at the list.erb page submit form for a todo item, which is named "todo"
+  end
+
+  def delete_todo_from_list(list_id, todo_id)
+    list = find_list(list_id)
+    list[:todos].reject! {|todo| todo[:id] == todo_id }  # updated Lesson 6, for any existing todo item with an id equal to todo_id `:id` from the url params, delete from todos with Array#reject!, https://launchschool.com/lessons/2c69904e/assignments/af479b47
+  end
+
+  def update_todo_status(list_id, todo_id, new_status)
+    list = find_list(list_id)
+    todo =  list[:todos].find {|t| t[:id] == todo_id } # refactored in lesson 6 assignment https://launchschool.com/lessons/2c69904e/assignments/af479b47
+    todo[:completed] = new_status
+  end
+
+  def mark_all_todos_as_completed(list_id)
+    list = find_list(list_id)
+    list[:todos].each { |todo| todo[:completed] = true }
   end
 
   private 
@@ -165,14 +192,14 @@ end
 post '/lists/:id' do
   list_name = params[:list_name].strip # for use in checking if name passed in as a param is valid(exists, not too long or short) before saving, see: https://launchschool.com/lessons/9230c94c/assignments/7923bc3a // .strip to remove any leading or trailing whitespace
   id = params[:id].to_i # from edit existing list method above
-  @list = load_list(@list_id) # Refactor from Lesson 6 assignment for handling non-existing lists passed to url params: https://launchschool.com/lessons/31df6daa/assignments/cb2ef1d2
+  @list = load_list(id) # Refactor from Lesson 6 assignment for handling non-existing lists passed to url params: https://launchschool.com/lessons/31df6daa/assignments/cb2ef1d2
 
   error = error_for_list_name(list_name) # method call returns a string error message from the method if the list_name passed in is invalid, otherwise it will return nil and the first branch of the if statement won't be executed.
   if error
     session[:error] = error # refactored at: https://launchschool.com/lessons/9230c94c/assignments/b47401cd
     erb :edit_list, layout: :layout
   else # create the new list name since the above two validations passed
-    @list[:name] = list_name
+    @storage.update_list_name(id, list_name)
     session[:success] = 'The list name has been updated.' # flash message for successful list creation https://launchschool.com/lessons/9230c94c/assignments/cfb2f0cb
     redirect "/lists/#{id}"
   end
@@ -182,10 +209,11 @@ end
 post '/lists/:id/destroy' do
   id = params[:id].to_i # from edit existing list method above
   @storage.delete_list(id)
+  
+  session[:success] = 'The list has been deleted.'
   if env["HTTP_X_REQUESTED_WITH"] == "XMLHttpRequest" # conditional for checking if an AJAX request was made, see Lesson 6: https://launchschool.com/lessons/2c69904e/assignments/94ee8ca2
     '/lists'
   else
-    session[:success] = 'The list has been deleted.'
     redirect '/lists' # redirect to the home page which is '/lists'
   end
 end
@@ -201,8 +229,8 @@ post '/lists/:list_id/todos' do
     session[:error] = error
     erb :list, layout: :layout
   else
-    id = next_element_id(@list[:todos]) # assign an id to the new todo item, Lesson 6 assignment: https://launchschool.com/lessons/9230c94c/assignments/046ee3e0, refactored to general method for lists and ids in next assignment: https://launchschool.com/lessons/2c69904e/assignments/a8c93890
-    @list[:todos] << { id: id, name: text, completed: false } # params[:todo] is the submitted text taken from form submission at the list.erb page submit form for a todo item, which is named "todo"
+    @storage.create_new_todo(@list_id, text)
+     
     session[:success] = 'The todo item was added to the list'
     redirect "/lists/#{@list_id}" # redirect back to the list we just added the item to
   end
@@ -213,7 +241,8 @@ post '/lists/:list_id/todos/:id/destroy' do
   @list_id = params[:list_id].to_i
   @list = load_list(@list_id) # Refactor from Lesson 6 assignment for handling non-existing lists passed to url params: https://launchschool.com/lessons/31df6daa/assignments/cb2ef1d2
   todo_id = params[:id].to_i # :id here being the id, or index of the todo list item for this list
-  @list[:todos].reject! {|todo| todo[:id] == todo_id }  # updated Lesson 6, for any existing todo item with an id equal to todo_id `:id` from the url params, delete from todos with Array#reject!, https://launchschool.com/lessons/2c69904e/assignments/af479b47
+
+  @storage.delete_todo_from_list(@list_id, todo_id)
   if env["HTTP_X_REQUESTED_WITH"] == "XMLHttpRequest" # conditional for checking if an AJAX request was made, see Lesson 6: https://launchschool.com/lessons/2c69904e/assignments/94ee8ca2
     status 204
   else
@@ -228,8 +257,9 @@ post '/lists/:list_id/todos/:id' do
   @list = load_list(@list_id) # Refactor from Lesson 6 assignment for handling non-existing lists passed to url params: https://launchschool.com/lessons/31df6daa/assignments/cb2ef1d2
   todo_id = params[:id].to_i # :id here being the id, or index of the todo list item for this list
   is_completed = params[:completed] == 'true'
-  todo =  @list[:todos].find {|todo| todo[:id] == todo_id } # refactored in lesson 6 assignment https://launchschool.com/lessons/2c69904e/assignments/af479b47
-  todo[:completed] = is_completed = params[:completed] == 'true'
+  
+  @storage.update_todo_status(@list_id, todo_id, is_completed) # need  the status itself, which is held in in_completed
+
   session[:success] = 'The todo item has been updated.'
   redirect "/lists/#{@list_id}"
 end
@@ -238,7 +268,7 @@ end
 post '/lists/:id/complete_all' do
   @list_id = params[:id].to_i
   @list = load_list(@list_id) # Refactor from Lesson 6 assignment for handling non-existing lists passed to url params: https://launchschool.com/lessons/31df6daa/assignments/cb2ef1d2
-  @list[:todos].each { |todo| todo[:completed] = true }
+  @storage.mark_all_todos_as_completed(@list_id)
   session[:success] = 'The todo items have all been updated to completed.'
   redirect "/lists/#{@list_id}"
 end
