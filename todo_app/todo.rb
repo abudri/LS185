@@ -17,11 +17,10 @@ require_relative 'database_persistence'  # session_persistence.rb
 configure do
   enable :sessions # tells sinatra to activate it's session support
   set :sessions_secret, 'secret' # setting the session secret, to the string 'secret'
+  set :erb, escape_html: true # Lesson 6, Sanitizing HTML: https://launchschool.com/lessons/31df6daa/assignments/d98e4174
+  also_reload 'database_persistence.rb' if development? # also_reload lets us not have to stop/start app when making changes to this file, see: https://launchschool.com/lessons/421e2d1e/assignments/732c2301
 end
 
-configure do
-  set :erb, escape_html: true # Lesson 6, Sanitizing HTML: https://launchschool.com/lessons/31df6daa/assignments/d98e4174
-end
 
 helpers do
   def list_complete?(list) # checks to see if all todo items in a list are completed
@@ -57,7 +56,7 @@ helpers do
 end
 
 before do
-  @storage = DatabasePersistence.new(logger)  # database_persistence.rb contains this class  # logger is an object provided by sinatra for logging purposes
+  @storage = DatabasePersistence.new(logger)  # database_persistence.rb contains this class  # logger is an object provided by sinatra for loggin purposes
 end
 
 # By using a common method to load the list, we have a place to define the code that handles a list not existing. Using redirect in Sinatra interrupts the processing of a request and prevents any later code from executing: https://launchschool.com/lessons/31df6daa/assignments/cb2ef1d2
