@@ -37,21 +37,18 @@ class DatabasePersistence
   end
 
   def delete_list(list_id)
-    query("DELETE FROM todos WHERE list_id = $1", id) # this is necessary since ON DELETE CASCADE constraint is not put on list_id in the todos table
-    query("DELETE FROM lists WHERE id = $1", id) # after deleting todos in the todos table associated with this list's id, we can then delete the list itself
+    query("DELETE FROM todos WHERE list_id = $1", list_id) # this is necessary since ON DELETE CASCADE constraint is not put on list_id in the todos table
+    query("DELETE FROM lists WHERE id = $1", list_id) # after deleting todos in the todos table associated with this list's id, we can then delete the list itself
   end
 
   def update_list_name(list_id, new_name)
-    sql = "UPDATE lists WHERE list_id = $1 SET name = $2"
-    query(sql, [list_id, new_name])
+    sql = "UPDATE lists SET name = $1 WHERE list_id = $2"
+    query(sql, new_name, list_id)
   end
 
   def create_new_todo(list_id, todo_name) # adding a new todo item to a list
     sql = "INSERT INTO todos (list_id, name) VALUES ($1, $2)" # note the $1, $2 order isn't the argument order in the line above, but the line below in the `query` method call
     query(sql, list_id, todo_name)
-    # list = find_list(list_id)
-    # id = next_element_id(list[:todos]) # assign an id to the new todo item, Lesson 6 assignment: https://launchschool.com/lessons/9230c94c/assignments/046ee3e0, refactored to general method for lists and ids in next assignment: https://launchschool.com/lessons/2c69904e/assignments/a8c93890
-    # list[:todos] << { id: id, name: todo_name, completed: false } # params[:todo] is the submitted text taken from form submission at the list.erb page submit form for a todo item, which is named "todo"
   end
 
   def delete_todo_from_list(list_id, todo_id)
@@ -61,7 +58,7 @@ class DatabasePersistence
 
   def update_todo_status(list_id, todo_id, new_status)
     sql = "UPDATE todos SET completed = $1 WHERE id = $2 AND list_id = $3"
-    query = (sql, new_status, todo_id, list_id)
+    query(sql, new_status, todo_id, list_id)
   end
 
   def mark_all_todos_as_completed(list_id)
