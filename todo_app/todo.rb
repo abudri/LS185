@@ -21,7 +21,6 @@ configure do
   also_reload 'database_persistence.rb' if development? # also_reload lets us not have to stop/start app when making changes to this file, see: https://launchschool.com/lessons/421e2d1e/assignments/732c2301
 end
 
-
 helpers do
   def list_complete?(list) # checks to see if all todo items in a list are completed
     todos_count(list) > 0 && todos_remaining_count(list) == 0 # from assignment: https://launchschool.com/lessons/9230c94c/assignments/dd71166b
@@ -57,6 +56,10 @@ end
 
 before do
   @storage = DatabasePersistence.new(logger)  # database_persistence.rb contains this class  # logger is an object provided by sinatra for loggin purposes
+end
+
+after do
+  @storage.disconnect  # prevents us from exceeding Heroku database 20 connection limit. See: https://launchschool.com/lessons/421e2d1e/assignments/54681a23
 end
 
 # By using a common method to load the list, we have a place to define the code that handles a list not existing. Using redirect in Sinatra interrupts the processing of a request and prevents any later code from executing: https://launchschool.com/lessons/31df6daa/assignments/cb2ef1d2

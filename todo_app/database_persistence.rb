@@ -2,9 +2,18 @@
 require 'pg'
 
 class DatabasePersistence
+
   def initialize(logger) # sinatra logger object passed as an argument for logging
-    @db = PG.connect(dbname: 'todos') # 
+    @db = if Sinatra::Base.production?
+            PG.connect(ENV['DATABASE_URL']) # connection for if we are using Heroku production environment
+          else
+            PG.connect(dbname: "todos") # standard normal connection we've been doing in development
+          end
     @logger = logger # see https://launchschool.com/lessons/421e2d1e/assignments/d7a23509
+  end
+  
+  def disconnect
+    @db.close # prevents us from exceeding Heroku database 20 connection limit. See: https://launchschool.com/lessons/421e2d1e/assignments/54681a23
   end
 
   def query(statement, *params)
